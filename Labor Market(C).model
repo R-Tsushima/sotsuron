@@ -1,0 +1,666 @@
+//====================================================================/
+//　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　/
+// artisoc                                                            /
+//                                                                    /
+//====================================================================/
+
+Version = 4.0;
+
+
+
+//-------------------------------------------------------
+// Component Tree
+//-------------------------------------------------------
+UNIVERSE {
+    Space Labor_Market(0,0),Square_2D(100, 100, Loop, North, 1, !Map_3D){
+        AgtType Workers(0, 0)[0] {
+            Dim ID(0, 0) As Integer = (0);
+            Dim X(0, 0) As Double = (0.0);
+            Dim Y(0, 0) As Double = (0.0);
+            Dim Layer(0, 0) As Integer = (0);
+            Dim Direction(0, 0) As Double = (0.0);
+            Dim condition(0, 0) As Integer = (0);
+            Dim w_bar(0, 0) As Double = (0.0);
+            Dim ue_time(0, 0) As Integer = (0);
+        }
+        AgtType Employers(0, 0)[0] {
+            Dim ID(0, 0) As Integer = (0);
+            Dim X(0, 0) As Double = (0.0);
+            Dim Y(0, 0) As Double = (0.0);
+            Dim Layer(0, 0) As Integer = (0);
+            Dim Direction(0, 0) As Double = (0.0);
+            Dim condition(0, 0) As Integer = (0);
+            Dim wage(0, 0) As Double = (0.0);
+            Dim e_time(0, 0) As Integer = (0);
+        }
+    }
+    Dim worker_num(0, 0) As Integer = (0);
+    Dim employer_num(0, 0) As Integer = (0);
+    Dim α(0, 0) As Double = (0.0);
+    Dim γ_0(0, 0) As Double = (0.0);
+    Dim γ_1(0, 0) As Double = (0.0);
+    Dim matching_num(0, 0) <4>  As Integer = (0);
+    Dim sum_wage(0, 0) As Double = (0.0);
+    Dim matching_rate(0, 0) <4>  As Double = (0.0);
+    Dim past_matching_num(0, 0)[4] As Integer = (4*0);
+    Dim view(0, 0) As Integer = (0);
+    Dim ave_wage(0, 0) As Double = (0.0);
+    Dim wage_rate(0, 0) As Double = (0.0);
+    Dim wage_bar(0, 0) As Double = (0.0);
+    Dim average_wage(0, 0) As Double = (0.0);
+    Dim ave_w_bar(0, 0) <4>  As Double = (0.0);
+    Dim average_w_bar(0, 0) As Double = (0.0);
+}
+
+
+//-------------------------------------------------------
+// Agent Variable Initial Data
+//-------------------------------------------------------
+Initial_Value {
+    UNIVERSE.WORKER_NUM = 1(1000);
+    UNIVERSE.EMPLOYER_NUM = 1(1000);
+    UNIVERSE.Α = 1(0.1);
+    UNIVERSE.Γ_0 = 1(0.7000000000000001);
+    UNIVERSE.Γ_1 = 1(0.0);
+    UNIVERSE.VIEW = 1(1);
+    UNIVERSE.WAGE_RATE = 1(0.3);
+}
+
+
+//-------------------------------------------------------
+// Agent Rule
+//-------------------------------------------------------
+#begin_rule UNIVERSE
+Univ_Init{
+dim i as Integer
+dim workers as AgtSet
+dim employers as AgtSet
+
+for i = 0 to Universe.worker_num - 1
+		CreateAgt(Universe.Labor_Market.Workers)
+next i
+				
+for i = 0 to Universe.employer_num - 1
+		CreateAgt(Universe.Labor_Market.Employers)
+next i
+
+MakeAgtsetSpace(workers, Universe.Labor_Market)
+RandomPutAgtsetCell(workers, False)
+MakeAgtsetSpace(employers, Universe.Labor_Market)
+RandomPutAgtsetCell(employers, False)
+}
+
+Univ_Step_Begin{
+
+}
+
+Univ_Step_End{
+dim employers_set as AgtSet
+dim employer as Agt
+dim workers_set as AgtSet
+dim worker as Agt
+dim i as Integer
+dim max_match as Double
+dim min_match as Double
+Universe.matching_num = 0
+Universe.sum_wage = 0
+Universe.wage_bar = 0
+MakeAgtset(employers_set, Universe.Labor_Market.Employers)
+MakeAgtSet(workers_set, Universe.Labor_Market.Workers)
+For each employer in employers_set
+		If employer.condition == Color_Blue then
+				Universe.matching_num = Universe.matching_num + 1
+				Universe.sum_wage = Universe.sum_wage + employer.wage
+		end if
+next employer
+
+For each worker in workers_set
+		if worker.condition == Color_Blue then
+				Universe.wage_bar = Universe.wage_bar + worker.w_bar
+		end if
+next worker
+
+if Universe.matching_num == 0 then
+		Universe.ave_wage = 0
+		Universe.ave_w_bar = 0
+else
+		Universe.ave_wage = Universe.sum_wage / Universe.matching_num
+		Universe.ave_w_bar = Universe.wage_bar / Universe.matching_num
+end if
+for i = 0 to 3
+		Universe.past_matching_num(i) = GetHistory(Universe.matching_num, i + 1)
+next i
+Universe.matching_rate = (Universe.past_matching_num(0) + Universe.past_matching_num(1)
+																					+ Universe.past_matching_num(2) + Universe.past_matching_num(3)
+																					+ Universe.matching_num)
+																					/ (5 * Universe.employer_num) * 100
+Universe.average_wage = (Universe.ave_wage + GetHistory(Universe.ave_wage, 1) + GetHistory(Universe.ave_wage, 2)
+																					 + GetHistory(Universe.ave_wage, 3) + GetHistory(Universe.ave_wage, 4)) / 5
+Universe.average_w_bar = (Universe.ave_w_bar + GetHistory(Universe.ave_w_bar, 1) + GetHistory(Universe.ave_w_bar, 2)
+																						+ GetHistory(Universe.ave_w_bar, 3) + GetHistory(Universe.ave_w_bar, 4)) / 5
+
+max_match = 0
+min_match = 100
+for i = 0 to 3
+		max_match = max(max_match, GetHistory(Universe.matching_rate, i + 1))
+		min_match = min(min_match, GetHistory(Universe.matching_rate, i + 1))
+next i
+
+if GetCountStep() == 100 then
+		ExitSimulation()
+end if
+}
+
+Univ_Finish{
+
+}
+
+function max(a as Double, b as Double) as Double
+{
+if a >= b then
+		return a
+else
+		return b
+end if
+}
+
+function min(a as Double, b as Double) as Double
+{
+if a<= b then
+		return a
+else
+		return b
+end if
+}
+#end_rule UNIVERSE
+
+
+
+
+//-------------------------------------------------------
+// Agent Rule
+//-------------------------------------------------------
+#begin_rule UNIVERSE.LABOR_MARKET.WORKERS
+Agt_Init{
+My.condition = Color_Red
+My.w_bar = 40 / Universe.worker_num * My.ID
+My.ue_time = 0
+}
+
+Agt_Step{
+dim one as Agt
+dim neighbor as AgtSet
+dim res_agtset as AgtSet
+dim res_agt as Agt
+if My.condition == Color_Red then //失職状態なら
+		MakeOneAgtSetAroundOwnCell(neighbor, Universe.view, Universe.Labor_Market.Employers, False)
+		//視野5の範囲でemployerを探す  
+		For each one in neighbor
+				if one.condition == Color_Red and My.w_bar > one.wage * Universe.wage_rate then  //employerが求人状態なら
+						AddAgt(res_agtset, one) //候補に加える
+				end if
+		next one
+		if CountAgtSet(res_agtset) == 0 or Rnd() > Universe.γ_0 then //候補がいなければ
+				My.ue_time = My.ue_time + 1 //失職期間を増やす
+				if My.ue_time >= 3 then
+						MoveToSpaceOwnCell(10) //視野10の範囲のランダムに空き地に移動
+						My.ue_time = 0
+				end if
+		else
+				one = GetAgt(res_agtset, Int(Rnd() * CountAgtSet(res_agtset)))
+				if one.wage > My.w_bar then
+						My.X = one.X
+						My.y = one.Y
+						one.condition = Color_Blue
+						My.condition = Color_Blue
+						My.ue_time = 0
+				end if
+		end if
+else //就職状態なら
+		if Rnd() < Universe.α then //αの確率で
+				MakeOneAgtSetAroundOwnCell(neighbor, 0, Universe.Labor_Market.Employers, False)
+				one = GetAgt(neighbor, 0)
+				//解雇され、視野10の範囲の空き地にランダムに移動
+				MoveToSpaceOwnCell(10)
+				one.condition = Color_Red
+				My.condition = Color_Red
+		end if
+end if
+}
+#end_rule UNIVERSE.LABOR_MARKET.WORKERS
+
+
+
+
+//-------------------------------------------------------
+// Agent Rule
+//-------------------------------------------------------
+#begin_rule UNIVERSE.LABOR_MARKET.EMPLOYERS
+Agt_Init{
+My.condition = Color_Red
+My.wage = 40 / Universe.employer_num * My.ID
+My.e_time = 0
+}
+
+Agt_Step{
+If My.condition == Color_Red then
+		My.e_time = My.e_time + 1
+		If My.e_time == 3 then
+				MoveToSpaceOwnCell(10) //視野10の範囲のランダムに空き地に移動
+				My.e_time = 0
+		end if
+end if
+}
+#end_rule UNIVERSE.LABOR_MARKET.EMPLOYERS
+
+
+
+
+//-------------------------------------------------------
+// Simulation Definition Division
+//-------------------------------------------------------
+Single_Simulation {
+    Step_Max = 0;
+    Time_Max = 0;
+    End_Condition = "";
+    Exec_Wait = 0;
+    Exec_Wait_Max = 1000;
+    Random_Generator = Java_Standard;
+    Exec_Order = Random;
+    Exec_Order_Random_First_Step_Only = No;
+    Random_Seed = 0;
+    Redraw_Timing = Step;
+    Redraw_Interval = 1;
+    Garbage_Interval = 0;
+}
+
+
+//-------------------------------------------------------
+// Simulation Loop Definition Division
+//-------------------------------------------------------
+Repeat_Simulation {
+    Value_Change = None;
+    Initial_Value_Change_None {
+        Repeat_Max = 1;
+    }
+}
+
+
+//-------------------------------------------------------
+// 2 Dimension Map Display Definition Division
+//-------------------------------------------------------
+Map_Output {
+    Map_Space_Name = "Universe.Labor_Market";
+    Map_Name = "Labor Market";
+    Title = "Labor Market";
+    Disable = No;
+    Background_Color = 255, 255, 255;
+    Position_x = 495;
+    Position_y = -6;
+    Size_x = 634;
+    Size_y = 544;
+    Map_Cell_Size = 2;
+    Remarks = Yes;
+    Legend_Pos = Top;
+    Font_Name = "Dialog";
+    Font_Char_Set = 81;
+    Font_Size = 12.0;
+    Font_Style = 0;
+    Font_Color = 0, 0, 0;
+    Font_Background_Color = 255, 255, 255;
+    FastDraw = Yes;
+    Draw_Timing = Simulation_Step;
+    Draw_Interval = 1;
+    Axis_Label = "", "";
+    Draw_Range = 0, 0, 100, 100;
+    Ruled_Line = No;
+    Text_Display = No;
+    Text_Display_Variable_Name = "";
+    Chess_Type_Display_Position = Yes;
+    Background_Transparent = No;
+    Target_Layer = 0;
+    Coordinate_Display = No;
+    Space_Kind = Square_2D;
+    BG_Pict = No;
+    BG_Type = 0;
+    BG_Var_Name = "";
+    BG_File_Name = "";
+    Origin_Position = 2;
+    Output_Group_Name = "";
+    Output {
+        Map_Element_Name = "Workers";
+        Map_Element = Agent_Variable;
+        Output_Expression = "Universe.Labor_Market.Workers";
+        Draw_Line = No;
+        Collection_Name = "";
+        Line_Type = 0;
+        Line_Arrow = 0;
+        Line_Width = 0;
+        Line_Color = 0, 0, 0;
+        Line_Type_Variable = "";
+        Line_Arrow_Variable = "";
+        Line_Width_Variable = "";
+        Line_Color_Variable = "";
+        Agent_Color = "Universe.Labor_Market.Workers.condition";
+        Marker_Id = 1;
+        Effective_Figures = 0;
+        Format_Id = 0;
+        Agent_Image_Direction = No;
+        Icon_Type = 0;
+        Icon_Var_Name = "";
+        Icon_Transparent = No;
+        Icon_Enlarg_Reduce = No;
+        Icon_File_Name = "";
+        Num_Display = No;
+        Num_Var_Name = "";
+        Agent_Image_Magnify_by_value = Yes;
+        Agent_Image_Magnify_Value = 1.0;
+        Agent_Image_Magnify_Variable_Name = "Universe.Labor_Market.Workers.ID";
+        Agent_Image_Transparency_by_value = Yes;
+        Agent_Image_Transparency_Value = 0.0;
+        Agent_Image_Transparency_Variable_Name = "Universe.Labor_Market.Workers.ID";
+    }
+    Output {
+        Map_Element_Name = "Employers";
+        Map_Element = Agent_Variable;
+        Output_Expression = "Universe.Labor_Market.Employers";
+        Draw_Line = No;
+        Collection_Name = "";
+        Line_Type = 0;
+        Line_Arrow = 0;
+        Line_Width = 0;
+        Line_Color = 0, 0, 0;
+        Line_Type_Variable = "";
+        Line_Arrow_Variable = "";
+        Line_Width_Variable = "";
+        Line_Color_Variable = "";
+        Agent_Color = "Universe.Labor_Market.Employers.condition";
+        Marker_Id = 3;
+        Effective_Figures = 0;
+        Format_Id = 0;
+        Agent_Image_Direction = No;
+        Icon_Type = 0;
+        Icon_Var_Name = "";
+        Icon_Transparent = No;
+        Icon_Enlarg_Reduce = No;
+        Icon_File_Name = "";
+        Num_Display = No;
+        Num_Var_Name = "";
+        Agent_Image_Magnify_by_value = Yes;
+        Agent_Image_Magnify_Value = 1.0;
+        Agent_Image_Magnify_Variable_Name = "Universe.Labor_Market.Employers.ID";
+        Agent_Image_Transparency_by_value = Yes;
+        Agent_Image_Transparency_Value = 0.0;
+        Agent_Image_Transparency_Variable_Name = "Universe.Labor_Market.Employers.ID";
+    }
+}
+
+
+//-------------------------------------------------------
+// Time Graph Output Definition Division
+//-------------------------------------------------------
+Time_Graph {
+    Font_Name = "Dialog";
+    Font_Char_Set = 81;
+    Font_Size = 12.0;
+    Font_Style = 0;
+    Font_Color = 0, 0, 0;
+    Font_Background_Color = 255, 255, 255;
+    Draw_Timing = Simulation_Step;
+    Draw_Interval = 1;
+    Graph_Name = "matching rate";
+    Title = "matching rate";
+    Disable = No;
+    Background_Color = 255, 255, 255;
+    Remarks = Yes;
+    Legend_Pos = Top;
+    FastDraw = No;
+    Position_x = 22;
+    Position_y = 341;
+    Size_x = 500;
+    Size_y = 300;
+    Map_Cell_Size = -1;
+    Axis_Label = "", "";
+    Draw_By_JFree_Chart = Yes;
+    Scale = 0, 0.0, 1000, 100.0, 100, 10.0;
+    ScaleAuto = Yes, Yes;
+    Output_Group_Name = "";
+    Output {
+        Graph_Element_Name = "matching rate";
+        Line_Color = 255, 0, 0;
+        Line_Width = 2;
+        Marker_Id = 0;
+        Output_Expression = "Universe.matching_num / Universe.employer_num* 100";
+        Expression_Value_Display = No;
+        Effective_Fraction_Figures = 0;
+        Graph_Element_Color = (0, 255, 0);
+    }
+}
+
+
+//-------------------------------------------------------
+// Numeric Data Window Output Definition Division
+//-------------------------------------------------------
+Numeric_Output {
+    Font_Name = "Dialog";
+    Font_Char_Set = 81;
+    Font_Size = 12.0;
+    Font_Style = 0;
+    Font_Color = 0, 0, 0;
+    Font_Background_Color = 255, 255, 255;
+    Position_x = 728;
+    Position_y = 399;
+    Size_x = 500;
+    Size_y = 273;
+    Map_Cell_Size = -1;
+    Numeric_Name = "result";
+    Title = "result";
+    Disable = No;
+    Output_Group_Name = "";
+    OUTPUT {
+        Output_Element_Name = "mathing rate";
+        Figures = 2;
+        Format_Id = 0;
+        Output_Expression = "Universe.matching_rate";
+    }
+    OUTPUT {
+        Output_Element_Name = "average wage";
+        Figures = 2;
+        Format_Id = 0;
+        Output_Expression = "Universe.ave_wage";
+    }
+    OUTPUT {
+        Output_Element_Name = "reservation wage";
+        Figures = 2;
+        Format_Id = 0;
+        Output_Expression = "Universe.average_w_bar";
+    }
+}
+
+
+//-------------------------------------------------------
+// Control Panel Definition Division
+//-------------------------------------------------------
+Control_Panel {
+    Display_Area = 0, 0, 968, 113;
+    Display_Type = 1;
+    Panel_Item {
+        Item_Type = Slider;
+        Item_Name = "worker_num";
+        Display_Area = 0, 0, 0, 0;
+        Font_Name = "";
+        Font_Char_Set = 0;
+        Font_Size = 0.0;
+        Font_Style = 0;
+        Font_Color = 0, 0, 0;
+        Font_Background_Color = 0, 0, 0;
+        Var_Name = "Universe.worker_num";
+        Slider_Range_Max = 400;
+        Slider_Value_Min = 0.0;
+        Slider_Value_Step = 10.0;
+        Slider_Value = "100";
+    }
+    Panel_Item {
+        Item_Type = Slider;
+        Item_Name = "employer_num";
+        Display_Area = 0, 0, 0, 0;
+        Font_Name = "";
+        Font_Char_Set = 0;
+        Font_Size = 0.0;
+        Font_Style = 0;
+        Font_Color = 0, 0, 0;
+        Font_Background_Color = 0, 0, 0;
+        Var_Name = "Universe.employer_num";
+        Slider_Range_Max = 400;
+        Slider_Value_Min = 0.0;
+        Slider_Value_Step = 10.0;
+        Slider_Value = "100";
+    }
+    Panel_Item {
+        Item_Type = Slider;
+        Item_Name = "α";
+        Display_Area = 0, 0, 0, 0;
+        Font_Name = "";
+        Font_Char_Set = 0;
+        Font_Size = 0.0;
+        Font_Style = 0;
+        Font_Color = 0, 0, 0;
+        Font_Background_Color = 0, 0, 0;
+        Var_Name = "Universe.α";
+        Slider_Range_Max = 100;
+        Slider_Value_Min = 0.0;
+        Slider_Value_Step = 0.01;
+        Slider_Value = "10";
+    }
+    Panel_Item {
+        Item_Type = Slider;
+        Item_Name = "γ_0";
+        Display_Area = 0, 0, 0, 0;
+        Font_Name = "";
+        Font_Char_Set = 0;
+        Font_Size = 0.0;
+        Font_Style = 0;
+        Font_Color = 0, 0, 0;
+        Font_Background_Color = 0, 0, 0;
+        Var_Name = "Universe.γ_0";
+        Slider_Range_Max = 100;
+        Slider_Value_Min = 0.0;
+        Slider_Value_Step = 0.01;
+        Slider_Value = "70";
+    }
+    Panel_Item {
+        Item_Type = Slider;
+        Item_Name = "γ_1";
+        Display_Area = 0, 0, 0, 0;
+        Font_Name = "";
+        Font_Char_Set = 0;
+        Font_Size = 0.0;
+        Font_Style = 0;
+        Font_Color = 0, 0, 0;
+        Font_Background_Color = 0, 0, 0;
+        Var_Name = "Universe.γ_1";
+        Slider_Range_Max = 100;
+        Slider_Value_Min = 0.0;
+        Slider_Value_Step = 0.01;
+        Slider_Value = "0";
+    }
+    Panel_Item {
+        Item_Type = Slider;
+        Item_Name = "view";
+        Display_Area = 0, 0, 0, 0;
+        Font_Name = "";
+        Font_Char_Set = 0;
+        Font_Size = 0.0;
+        Font_Style = 0;
+        Font_Color = 0, 0, 0;
+        Font_Background_Color = 0, 0, 0;
+        Var_Name = "Universe.view";
+        Slider_Range_Max = 10;
+        Slider_Value_Min = 0.0;
+        Slider_Value_Step = 1.0;
+        Slider_Value = "1";
+    }
+    Panel_Item {
+        Item_Type = Slider;
+        Item_Name = "wage_rate";
+        Display_Area = 0, 0, 0, 0;
+        Font_Name = "";
+        Font_Char_Set = 0;
+        Font_Size = 0.0;
+        Font_Style = 0;
+        Font_Color = 0, 0, 0;
+        Font_Background_Color = 0, 0, 0;
+        Var_Name = "Universe.wage_rate";
+        Slider_Range_Max = 100;
+        Slider_Value_Min = 0.0;
+        Slider_Value_Step = 0.01;
+        Slider_Value = "30";
+    }
+}
+
+
+//-------------------------------------------------------
+// Space Initial Value Definition Divsion
+//-------------------------------------------------------
+Space_Initial {
+}
+
+
+//-------------------------------------------------------
+// Other Miscellaneous Data Definition Division
+//-------------------------------------------------------
+Others_Data {
+    Indent = 4;
+    Rule_Colored = Yes;
+    Rule_LineNo = Yes;
+    Window_Hide_Run = 1;
+    Debug_Position_x = 75;
+    Debug_Position_y = 75;
+    Debug_Size_x = 400;
+    Debug_Size_y = 200;
+    Console_Position_x = -34;
+    Console_Position_y = 232;
+    Console_Size_x = 600;
+    Console_Size_y = 120;
+    Componen_Tree_Position_x = 6;
+    Componen_Tree_Position_y = 11;
+    Componen_Tree_Size_x = 250;
+    Componen_Tree_Size_y = 400;
+    Console_Background_Color = 16777215;
+    Console_Foreground_Color = 255;
+    Console_DisplayLines_Max = 500;
+    plug_in_module_name = "";
+    Font_Name = "Dialog";
+    Font_Char_Set = 0;
+    Font_Size = 14.0;
+    Font_Style = 0;
+    Font_Color = 0, 0, 0;
+    Font_Background_Color = 0, 0, 0;
+}
+
+
+//-------------------------------------------------------
+// Network Information Definition Division
+//-------------------------------------------------------
+Network_Info {
+    Global_Space_Area = 0, 0, 100, 100;
+    Local_Space_Info {
+    }
+}
+
+
+//-------------------------------------------------------
+// Window Location Definition Division
+//-------------------------------------------------------
+Window_Rectangle {
+    Window_Name = Main_Window, -8, -8, 1382, 744;
+    Window_Name = Output_Setting_Window, 175, 175, 480, 350;
+    Window_Name = Artisoc_Help_Window, 10, 10, 775, 300;
+}
+
+
+//-------------------------------------------------------
+// Help Favorite Division
+//-------------------------------------------------------
+Help_Favorite {
+}
